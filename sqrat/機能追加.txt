@@ -1,0 +1,75 @@
+Author: 渡邊剛(go@wamsoft.jp)
+Date: 2010/11/4
+
+sqratに対する機能追加/仕様変更点のメモです
+
+・スクリプトコンパイル用の口は封印(例外つかってるため)
+
+・static 関数は登録時に static フラグを立てるように修正
+
+・インスタンスの型処理が一切行われていなかったので行うように修正。
+　
+　インスタンスから違うネイティブ型を取得しようとすると NULL が帰ります。
+
+・(ソース修正)ポインタ系の警告が出る部分を表記修正多数
+
+・Sqrat::Class に、SQFUNCTION 形式の
+　メンバメソッドを登録するための口 VarArgFunc()を追加
+
+  SQRESLULT method(HSQUIRRELVM v); の形のメンバを直接登録できます。
+
+・自前で生成したオブジェクトを適切にバインドする機構が無かったので追加
+
+  ClassType::PushInstanceInit を新設
+  Allocator 系にこれの処理用の Init() メソッド追加
+
+  関数から通常ポインタを返す場合はこれが呼ばれます。
+
+  通常バインド関数での値の返し
+
+　Type* method(int arg, float arg) {
+    ....
+　　return (Type*)value;
+  }
+
+　SQFUNCTION形式関数での値の返し
+
+  SQSRESULT method(HSQUIRRELVM v) {
+    ...
+　  sqrat::Var<Type*>::push(vm, (Type*)value);
+    return 1;
+  }
+
+  const ポインタを返す場合は PushInstance が呼ばれるため Init() は呼ばれません
+
+・printf 機能を追加
+
+　sqrat::printf(vm, _SC("format %d...."), 1, (Type*)a, ...);
+
+  のスタイルで sqstd_printf 系を経由した printf が呼び出し可能です。
+　※sqstd_printf は独自追加したライブラリ関数です
+
+・ObjectInfo をバインド関数の引数としてとれるようにした
+
+  squirrel 側でオブジェクト機能の一貫で拡張した sqobject::ObjectInfo
+  を直接扱えます。
+
+  int func(int a, float b, const ObjectInfo &data); 
+　
+　といった形の関数が直接登録可能です。引数を自前で型判定したい場合に便利です。
+　※引数は const& でなくても良いですがそうするとコピーが余分に発生します
+
+　メモ：
+　すわりが微妙に悪いので ObjectInfo の機能を sqrat::Object に移植するかも
+
+・std::vector, std::map をバインド関数の引数としてとれるようにした
+
+  int func(const vector<int> &hoge, const map<sqstring,float> &hoge)
+
+　といった形の関数が直接登録可能です。それぞれ squirrel の配列/辞書を
+　自動的に詰め直した値がわたってきます。
+　※引数は const& でなくても良いですがそうするとコピーが余分に発生します
+
+　メモ:
+  実装に sqobject::ObjectInfo を使ってます
+
