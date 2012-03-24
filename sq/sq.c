@@ -16,6 +16,7 @@
 #include <sqstdmath.h>	
 #include <sqstdstring.h>
 #include <sqstdaux.h>
+#include "sqobject/sqobjectclass.h"
 
 #ifdef SQUNICODE
 #define scfprintf fwprintf
@@ -70,7 +71,10 @@ void PrintUsage()
 		_SC("Available options are:\n")
 		_SC("   -c              compiles the file to bytecode(default output 'out.cnut')\n")
 		_SC("   -o              specifies output file for the -c option\n")
+		_SC("   -e              specifies output file endian for the -c option\n")
+		_SC("                   0:default 1:little 2:big\n")
 		_SC("   -c              compiles only\n")
+	    _SC("   -p file         precompile file\n")
 		_SC("   -d              generates debug infos\n")
 		_SC("   -v              displays version infos\n")
 		_SC("   -h              prints help\n"));
@@ -78,6 +82,7 @@ void PrintUsage()
 
 #define _INTERACTIVE 0
 #define _DONE 2
+#define _ERROR 3
 //<<FIXME>> this func is a mess
 int getargs(HSQUIRRELVM v,int argc, char* argv[])
 {
@@ -87,6 +92,8 @@ int getargs(HSQUIRRELVM v,int argc, char* argv[])
 	const SQChar *ret=NULL;
 	char * output = NULL;
 	int lineinfo=0;
+	int endian=0;
+	const char *precompile = NULL;
 	if(argc>1)
 	{
 		int arg=1,exitloop=0;
@@ -109,6 +116,12 @@ int getargs(HSQUIRRELVM v,int argc, char* argv[])
 						output = argv[arg];
 					}
 					break;
+				case 'e':
+					if(arg < argc) {
+						arg++;
+						endian = atoi(argv[arg]);
+					}
+					break;
 				case 'v':
 					PrintVersionInfos();
 					return _DONE;
@@ -117,16 +130,43 @@ int getargs(HSQUIRRELVM v,int argc, char* argv[])
 					PrintVersionInfos();
 					PrintUsage();
 					return _DONE;
+				case 'p':
+					if (arg < argc) {
+						arg++;
+						precompile = argv[arg];
+					}
+					break;
 				default:
 					PrintVersionInfos();
 					scprintf(_SC("unknown prameter '-%c'\n"),argv[arg][1]);
 					PrintUsage();
-					return _DONE;
+					return _ERROR;
 				}
 			}else break;
 			arg++;
 		}
 
+		// precompile header
+		if (precompile) {
+			const SQChar *a;
+#ifdef SQUNICODE
+			int alen=(int)strlen(precompile);
+			a=sq_getscratchpad(v,(int)(alen*sizeof(SQChar)));
+			mbstowcs(sq_getscratchpad(v,-1),precompile,alen);
+			sq_getscratchpad(v,-1)[alen] = _SC('\0');
+#else
+			a=precompile;
+#endif
+			if(SQ_FAILED(sqstd_dofile(v,a,SQFalse,SQTrue))) {
+				const SQChar *err;
+				sq_getlasterror(v);
+				if(SQ_SUCCEEDED(sq_getstring(v,-1,&err))) {
+					scprintf(_SC("Error [%s]\n"),err);
+					return _ERROR;
+				}
+			}
+		}
+		
 		// src file
 		
 		if(arg<argc) {
@@ -171,7 +211,7 @@ int getargs(HSQUIRRELVM v,int argc, char* argv[])
 						outfile = output;
 #endif
 					}
-					if(SQ_SUCCEEDED(sqstd_writeclosuretofile(v,outfile)))
+					if(SQ_SUCCEEDED(sqstd_writeclosuretofile(v,outfile,endian)))
 						return _DONE;
 				}
 			}
@@ -186,7 +226,7 @@ int getargs(HSQUIRRELVM v,int argc, char* argv[])
 				sq_getlasterror(v);
 				if(SQ_SUCCEEDED(sq_getstring(v,-1,&err))) {
 					scprintf(_SC("Error [%s]\n"),err);
-					return _DONE;
+					return _ERROR;
 				}
 			}
 			
@@ -287,7 +327,8 @@ int main(int argc, char* argv[])
 	_CrtSetAllocHook(MemAllocHook);
 #endif
 	
-	v=sq_open(1024);
+	//v= sq_open(1024);
+	v= sqobject::init();
 	sq_setprintfunc(v,printfunc);
 
 	sq_pushroottable(v);
@@ -295,15 +336,18 @@ int main(int argc, char* argv[])
 	sqstd_register_bloblib(v);
 	sqstd_register_iolib(v);
 	sqstd_register_systemlib(v);
-	sqstd_register_mathlib(v);
-	sqstd_register_stringlib(v);
+//	sqstd_register_mathlib(v);
+//	sqstd_register_stringlib(v);
 
 	//aux library
 	//sets error handlers
-	sqstd_seterrorhandlers(v);
+//	sqstd_seterrorhandlers(v);
 
+	sqobject::Object::registerClass();
+	
 	//gets arguments
-	switch(getargs(v,argc,argv))
+	int ret;
+	switch((ret = getargs(v,argc,argv)))
 	{
 	case _INTERACTIVE:
 		Interactive(v);
@@ -313,12 +357,14 @@ int main(int argc, char* argv[])
 		break;
 	}
 
-	sq_close(v);
+	//sq_close(v);
+	sqobject::done();
 	
 #if defined(_MSC_VER) && defined(_DEBUG)
 	_getch();
 	_CrtMemDumpAllObjectsSince( NULL );
 #endif
-	return 0;
+	
+	return ret == _ERROR ? -1 : 0;
 }
 
