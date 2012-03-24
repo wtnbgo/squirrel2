@@ -122,6 +122,7 @@ typedef unsigned short wchar_t;
 typedef wchar_t SQChar;
 #define _SC(a) L##a
 #define	scstrcmp	wcscmp
+#define	scstrncmp	wcsncmp
 #define scsprintf	swprintf
 #define scstrlen	wcslen
 #define scstrtod	wcstod
@@ -129,6 +130,7 @@ typedef wchar_t SQChar;
 #define scatoi		_wtoi
 #define scstrtoul	wcstoul
 #define scvsprintf	vswprintf
+#define scvsnprintf	vsnwprintf
 #define scstrstr	wcsstr
 #define scisspace	iswspace
 #define scisdigit	iswdigit
@@ -142,6 +144,7 @@ typedef wchar_t SQChar;
 typedef char SQChar;
 #define _SC(a) a
 #define	scstrcmp	strcmp
+#define	scstrncmp	strncmp
 #define scsprintf	sprintf
 #define scstrlen	strlen
 #define scstrtod	strtod
@@ -149,6 +152,7 @@ typedef char SQChar;
 #define scatoi		atoi
 #define scstrtoul	strtoul
 #define scvsprintf	vsprintf
+#define scvsnprintf	vsnprintf
 #define scstrstr	strstr
 #define scisspace	isspace
 #define scisdigit	isdigit
@@ -365,10 +369,12 @@ SQUIRREL_API void sq_pushregistrytable(HSQUIRRELVM v);
 SQUIRREL_API void sq_pushconsttable(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_setroottable(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_setconsttable(HSQUIRRELVM v);
+SQUIRREL_API SQRESULT sq_setexceptionclass(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_newslot(HSQUIRRELVM v, SQInteger idx, SQBool bstatic);
 SQUIRREL_API SQRESULT sq_deleteslot(HSQUIRRELVM v,SQInteger idx,SQBool pushval);
 SQUIRREL_API SQRESULT sq_set(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_get(HSQUIRRELVM v,SQInteger idx);
+SQUIRREL_API SQBool sq_exists(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawget(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawset(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawdeleteslot(HSQUIRRELVM v,SQInteger idx,SQBool pushval);
@@ -378,6 +384,7 @@ SQUIRREL_API SQRESULT sq_arrayresize(HSQUIRRELVM v,SQInteger idx,SQInteger newsi
 SQUIRREL_API SQRESULT sq_arrayreverse(HSQUIRRELVM v,SQInteger idx); 
 SQUIRREL_API SQRESULT sq_arrayremove(HSQUIRRELVM v,SQInteger idx,SQInteger itemidx);
 SQUIRREL_API SQRESULT sq_arrayinsert(HSQUIRRELVM v,SQInteger idx,SQInteger destpos);
+SQUIRREL_API SQRESULT sq_arrayremovevalue(HSQUIRRELVM v,SQInteger idx,SQBool all);
 SQUIRREL_API SQRESULT sq_setdelegate(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_getdelegate(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_clone(HSQUIRRELVM v,SQInteger idx);
@@ -391,7 +398,7 @@ SQUIRREL_API SQRESULT sq_call(HSQUIRRELVM v,SQInteger params,SQBool retval,SQBoo
 SQUIRREL_API SQRESULT sq_resume(HSQUIRRELVM v,SQBool retval,SQBool raiseerror);
 SQUIRREL_API const SQChar *sq_getlocal(HSQUIRRELVM v,SQUnsignedInteger level,SQUnsignedInteger idx);
 SQUIRREL_API const SQChar *sq_getfreevariable(HSQUIRRELVM v,SQInteger idx,SQUnsignedInteger nval);
-SQUIRREL_API SQRESULT sq_throwerror(HSQUIRRELVM v,const SQChar *err);
+SQUIRREL_API SQRESULT sq_throwerror(HSQUIRRELVM v,const SQChar *err, ...);
 SQUIRREL_API void sq_reseterror(HSQUIRRELVM v);
 SQUIRREL_API void sq_getlasterror(HSQUIRRELVM v);
 
@@ -411,7 +418,10 @@ SQUIRREL_API SQRESULT sq_getobjtypetag(HSQOBJECT *o,SQUserPointer * typetag);
 SQUIRREL_API SQInteger sq_collectgarbage(HSQUIRRELVM v);
 
 /*serialization*/
-SQUIRREL_API SQRESULT sq_writeclosure(HSQUIRRELVM vm,SQWRITEFUNC writef,SQUserPointer up);
+#define SQ_DEFAULT_ENDIAN 0
+#define SQ_LITTLE_ENDIAN 1
+#define SQ_BIG_ENDIAN 2
+SQUIRREL_API SQRESULT sq_writeclosure(HSQUIRRELVM vm,SQWRITEFUNC writef,SQUserPointer up, SQInteger endian=0);
 SQUIRREL_API SQRESULT sq_readclosure(HSQUIRRELVM vm,SQREADFUNC readf,SQUserPointer up);
 
 /*mem allocation*/
@@ -450,8 +460,8 @@ SQUIRREL_API void sq_setdebughook(HSQUIRRELVM v);
 #define SQ_OK (0)
 #define SQ_ERROR (-1)
 
-#define SQ_FAILED(res) (res<0)
-#define SQ_SUCCEEDED(res) (res>=0)
+#define SQ_FAILED(res) ((res)<0)
+#define SQ_SUCCEEDED(res) ((res)>=0)
 
 #ifdef __cplusplus
 } /*extern "C"*/
