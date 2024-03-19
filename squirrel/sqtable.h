@@ -10,11 +10,11 @@
 #include "sqstring.h"
 
 
-#define hashptr(p)  ((SQHash)(((SQInteger)p) >> 3))
+#define hashptr(p)  ((SQHash)(((SQIntPtr)p) >> 3))
 
 inline SQHash HashObj(const SQObjectPtr &key)
 {
-	switch(type(key)) {
+	switch(sqtype(key)) {
 		case OT_STRING:		return _string(key)->_hash;
 		case OT_FLOAT:		return (SQHash)((SQInteger)_float(key));
 		case OT_BOOL: case OT_INTEGER:	return (SQHash)((SQInteger)_integer(key));
@@ -66,12 +66,13 @@ public:
 	{
 		_HashNode *n = &_nodes[hash];
 		do{
-			if(_rawval(n->key) == _rawval(key) && type(n->key) == type(key)){
+			if(_rawval(n->key) == _rawval(key) && sqtype(n->key) == sqtype(key)){
 				return n;
 			}
 		}while((n = n->next));
 		return NULL;
 	}
+	bool Exist(const SQObjectPtr &key);
 	bool Get(const SQObjectPtr &key,SQObjectPtr &val);
 	void Remove(const SQObjectPtr &key);
 	bool Set(const SQObjectPtr &key, const SQObjectPtr &val);

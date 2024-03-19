@@ -102,8 +102,10 @@ public:
 	
 	SQCOMPILERERROR _compilererrorhandler;
 	SQPRINTFUNCTION _printfunc;
+	SQPRINTFUNCTION _printerrfunc;
 	bool _debuginfo;
 	bool _notifyallexceptions;
+	SQObjectPtr _exceptionclass;
 private:
 	SQChar *_scratchpad;
 	SQInteger _scratchpadsize;

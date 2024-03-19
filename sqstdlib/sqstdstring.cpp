@@ -73,8 +73,50 @@ SQRESULT sqstd_format(HSQUIRRELVM v,SQInteger nformatstringidx,SQInteger *outlen
 	SQChar fmt[MAX_FORMAT_LEN];
 	sq_getstring(v,nformatstringidx,&format);
 	SQInteger allocated = (sq_getsize(v,nformatstringidx)+2)*sizeof(SQChar);
+
+	// first convert parameters
+	SQInteger n = 0, nparam = nformatstringidx+1, w=0, top = sq_gettop(v);
+	while(format[n] != '\0') {
+		if(format[n] != '%') {
+			n++;
+		}
+		else if(format[n+1] == '%') { //handles %%
+			n += 2; 
+		}
+		else {
+			n++;
+			if( nparam > top ) {
+				sq_settop(v,top);
+				return sq_throwerror(v,_SC("not enough paramters for the given format string"));
+			}
+			n = validate_format(v,fmt,format,n,w);
+			if(n < 0) {
+				sq_settop(v,top);
+				return -1;
+			}
+			switch(format[n]) {
+			case 's':
+				sq_tostring(v, nparam);
+				break;
+			case 'i': case 'd': case 'c':case 'o':  case 'u':  case 'x':  case 'X':
+				sq_push(v, nparam);
+				break;
+			case 'f': case 'g': case 'G': case 'e':  case 'E':
+				sq_push(v, nparam);
+				break;
+			default:
+				sq_settop(v,top);
+				return sq_throwerror(v,_SC("invalid format"));
+			}
+			n++;
+			nparam ++;
+		}
+	}
+
+	// next do printf works
 	dest = sq_getscratchpad(v,allocated);
-	SQInteger n = 0,i = 0, nparam = nformatstringidx+1, w = 0;
+	n = 0; nparam = top+1; w=0;
+	SQInteger i = 0;
 	while(format[n] != '\0') {
 		if(format[n] != '%') {
 			assert(i < allocated);
@@ -87,35 +129,47 @@ SQRESULT sqstd_format(HSQUIRRELVM v,SQInteger nformatstringidx,SQInteger *outlen
 		}
 		else {
 			n++;
-			if( nparam > sq_gettop(v) )
+			if( nparam > sq_gettop(v) ) {
+				sq_settop(v,top);
 				return sq_throwerror(v,_SC("not enough paramters for the given format string"));
+			}
 			n = validate_format(v,fmt,format,n,w);
-			if(n < 0) return -1;
+			if(n < 0) {
+				sq_settop(v,top);
+				return -1;
+			}
 			SQInteger addlen = 0;
 			SQInteger valtype = 0;
-			const SQChar *ts;
+			const SQChar *ts = NULL;
 			SQInteger ti;
 			SQFloat tf;
 			switch(format[n]) {
 			case 's':
-				if(SQ_FAILED(sq_getstring(v,nparam,&ts))) 
+				if(SQ_FAILED(sq_getstring(v,nparam,&ts))) {
+					sq_settop(v,top);
 					return sq_throwerror(v,_SC("string expected for the specified format"));
+				}
 				addlen = (sq_getsize(v,nparam)*sizeof(SQChar))+((w+1)*sizeof(SQChar));
 				valtype = 's';
 				break;
 			case 'i': case 'd': case 'c':case 'o':  case 'u':  case 'x':  case 'X':
-				if(SQ_FAILED(sq_getinteger(v,nparam,&ti))) 
+				if(SQ_FAILED(sq_getinteger(v,nparam,&ti)))  {
+					sq_settop(v,top);
 					return sq_throwerror(v,_SC("integer expected for the specified format"));
+				}
 				addlen = (ADDITIONAL_FORMAT_SPACE)+((w+1)*sizeof(SQChar));
 				valtype = 'i';
 				break;
 			case 'f': case 'g': case 'G': case 'e':  case 'E':
-				if(SQ_FAILED(sq_getfloat(v,nparam,&tf))) 
+				if(SQ_FAILED(sq_getfloat(v,nparam,&tf))) {
+					sq_settop(v,top);
 					return sq_throwerror(v,_SC("float expected for the specified format"));
+				}
 				addlen = (ADDITIONAL_FORMAT_SPACE)+((w+1)*sizeof(SQChar));
 				valtype = 'f';
 				break;
 			default:
+				sq_settop(v,top);
 				return sq_throwerror(v,_SC("invalid format"));
 			}
 			n++;
@@ -129,10 +183,41 @@ SQRESULT sqstd_format(HSQUIRRELVM v,SQInteger nformatstringidx,SQInteger *outlen
 			nparam ++;
 		}
 	}
+	sq_settop(v,top);
 	*outlen = i;
 	dest[i] = '\0';
 	*output = dest;
 	return SQ_OK;
+}
+
+SQInteger sqstd_printf(HSQUIRRELVM v, SQInteger nargs)
+{
+	SQInteger n = sq_gettop(v);
+	SQChar *dest = NULL;
+	SQInteger length = 0;
+	if(SQ_SUCCEEDED(sqstd_format(v,n-nargs,&length,&dest))) {
+		SQPRINTFUNCTION func = sq_getprintfunc(v);
+		if (func) {
+			func(v, _SC("%*s"), length, dest);
+		}
+	}
+	sq_pop(v, nargs+1);
+	return length;
+}
+
+SQInteger sqstd_errprintf(HSQUIRRELVM v, SQInteger nargs)
+{
+	SQInteger n = sq_gettop(v);
+	SQChar *dest = NULL;
+	SQInteger length = 0;
+	if(SQ_SUCCEEDED(sqstd_format(v,n-nargs,&length,&dest))) {
+		SQPRINTFUNCTION func = sq_getprinterrfunc(v);
+		if (func) {
+			func(v, _SC("%*s"), length, dest);
+		}
+	}
+	sq_pop(v, nargs+1);
+	return length;
 }
 
 static SQInteger _string_format(HSQUIRRELVM v)
@@ -143,6 +228,32 @@ static SQInteger _string_format(HSQUIRRELVM v)
 		return -1;
 	sq_pushstring(v,dest,length);
 	return 1;
+}
+
+static SQInteger _string_printf(HSQUIRRELVM v)
+{
+	SQChar *dest = NULL;
+	SQInteger length = 0;
+	if(SQ_FAILED(sqstd_format(v,2,&length,&dest)))
+		return -1;
+	SQPRINTFUNCTION func = sq_getprintfunc(v);
+	if (func) {
+		func(v, _SC("%*s"), length, dest);
+	}
+	return 0;
+}
+
+static SQInteger _string_errprintf(HSQUIRRELVM v)
+{
+	SQChar *dest = NULL;
+	SQInteger length = 0;
+	if(SQ_FAILED(sqstd_format(v,2,&length,&dest)))
+		return -1;
+	SQPRINTFUNCTION func = sq_getprinterrfunc(v);
+	if (func) {
+		func(v, _SC("%*s"), length, dest);
+	}
+	return 0;
 }
 
 static void __strip_l(const SQChar *str,const SQChar **start)
@@ -170,7 +281,7 @@ static SQInteger _string_strip(HSQUIRRELVM v)
 	SQInteger len = sq_getsize(v,2);
 	__strip_l(str,&start);
 	__strip_r(str,len,&end);
-	sq_pushstring(v,start,end - start);
+	sq_pushstring(v,start,(SQInteger)(end - start));
 	return 1;
 }
 
@@ -189,7 +300,7 @@ static SQInteger _string_rstrip(HSQUIRRELVM v)
 	sq_getstring(v,2,&str);
 	SQInteger len = sq_getsize(v,2);
 	__strip_r(str,len,&end);
-	sq_pushstring(v,str,end - str);
+	sq_pushstring(v,str,(SQInteger)(end - str));
 	return 1;
 }
 
@@ -242,10 +353,10 @@ static void _addrexmatch(HSQUIRRELVM v,const SQChar *str,const SQChar *begin,con
 {
 	sq_newtable(v);
 	sq_pushstring(v,_SC("begin"),-1);
-	sq_pushinteger(v,begin - str);
+	sq_pushinteger(v,(SQInteger)(begin - str));
 	sq_rawset(v,-3);
 	sq_pushstring(v,_SC("end"),-1);
-	sq_pushinteger(v,end - str);
+	sq_pushinteger(v,(SQInteger)(end - str));
 	sq_rawset(v,-3);
 }
 
@@ -324,6 +435,8 @@ static SQRegFunction rexobj_funcs[]={
 
 #define _DECL_FUNC(name,nparams,pmask) {_SC(#name),_string_##name,nparams,pmask}
 static SQRegFunction stringlib_funcs[]={
+	_DECL_FUNC(printf,-2,_SC(".s")),
+	_DECL_FUNC(errprintf,-2,_SC(".s")),
 	_DECL_FUNC(format,-2,_SC(".s")),
 	_DECL_FUNC(strip,2,_SC(".s")),
 	_DECL_FUNC(lstrip,2,_SC(".s")),

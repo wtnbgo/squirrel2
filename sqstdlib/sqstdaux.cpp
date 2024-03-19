@@ -5,7 +5,7 @@
 
 void sqstd_printcallstack(HSQUIRRELVM v)
 {
-	SQPRINTFUNCTION pf = sq_getprintfunc(v);
+	SQPRINTFUNCTION pf = sq_getprinterrfunc(v);
 	if(pf) {
 		SQStackInfos si;
 		SQInteger i;
@@ -98,7 +98,7 @@ void sqstd_printcallstack(HSQUIRRELVM v)
 
 static SQInteger _sqstd_aux_printerror(HSQUIRRELVM v)
 {
-	SQPRINTFUNCTION pf = sq_getprintfunc(v);
+	SQPRINTFUNCTION pf = sq_getprinterrfunc(v);
 	if(pf) {
 		const SQChar *sErr = 0;
 		if(sq_gettop(v)>=1) {
@@ -106,7 +106,13 @@ static SQInteger _sqstd_aux_printerror(HSQUIRRELVM v)
 				pf(v,_SC("\nAN ERROR HAS OCCURED [%s]\n"),sErr);
 			}
 			else{
-				pf(v,_SC("\nAN ERROR HAS OCCURED [unknown]\n"));
+				sq_tostring(v,2);
+				if(SQ_SUCCEEDED(sq_getstring(v,-1,&sErr)))	{
+					pf(v,_SC("\nAN ERROR HAS OCCURED [%s]\n"),sErr);
+				} else {
+					pf(v,_SC("\nAN ERROR HAS OCCURED [unknown]\n"));
+				}
+				sq_pop(v, 1);
 			}
 			sqstd_printcallstack(v);
 		}
@@ -116,10 +122,24 @@ static SQInteger _sqstd_aux_printerror(HSQUIRRELVM v)
 
 void _sqstd_compiler_error(HSQUIRRELVM v,const SQChar *sErr,const SQChar *sSource,SQInteger line,SQInteger column)
 {
-	SQPRINTFUNCTION pf = sq_getprintfunc(v);
+	SQPRINTFUNCTION pf = sq_getprinterrfunc(v);
 	if(pf) {
 		pf(v,_SC("%s line = (%d) column = (%d) : error %s\n"),sSource,line,column,sErr);
 	}
+}
+
+static SQInteger printCallStack(HSQUIRRELVM v)
+{
+	sqstd_printcallstack(v);
+	return SQ_OK;
+}
+
+static SQInteger notifyAllExceptions(HSQUIRRELVM v)
+{
+	SQBool enable;
+	sq_tobool(v, 1, &enable);
+	sq_notifyallexceptions(v, enable != SQFalse);
+	return SQ_OK;
 }
 
 void sqstd_seterrorhandlers(HSQUIRRELVM v)
@@ -127,4 +147,15 @@ void sqstd_seterrorhandlers(HSQUIRRELVM v)
 	sq_setcompilererrorhandler(v,_sqstd_compiler_error);
 	sq_newclosure(v,_sqstd_aux_printerror,0);
 	sq_seterrorhandler(v);
+
+	// additional functions
+	sq_pushroottable(v);
+	sq_pushstring(v, _SC("printCallStack"), -1);
+	sq_newclosure(v, printCallStack, 0);
+	sq_createslot(v, -3);
+	sq_pushstring(v, _SC("notifyAllExceptions"), -1);
+	sq_newclosure(v, notifyAllExceptions, 0);
+	sq_setparamscheck(v, 2, _SC(".n|b"));
+	sq_createslot(v, -3);
+	sq_pop(v,1);
 }

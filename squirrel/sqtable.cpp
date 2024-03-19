@@ -60,7 +60,7 @@ void SQTable::Rehash(bool force)
 	_usednodes = 0;
 	for (SQInteger i=0; i<oldsize; i++) {
 		_HashNode *old = nold+i;
-		if (type(old->key) != OT_NULL)
+		if (sqtype(old->key) != OT_NULL)
 			NewSlot(old->key,old->val);
 	}
 	for(SQInteger k=0;k<oldsize;k++) 
@@ -80,9 +80,17 @@ SQTable *SQTable::Clone()
 	return nt;
 }
 
+bool SQTable::Exist(const SQObjectPtr &key)
+{
+	if(sqtype(key) == OT_NULL)
+		return false;
+	_HashNode *n = _Get(key, HashObj(key) & (_numofnodes - 1));
+	return n != 0;
+}
+
 bool SQTable::Get(const SQObjectPtr &key,SQObjectPtr &val)
 {
-	if(type(key) == OT_NULL)
+	if(sqtype(key) == OT_NULL)
 		return false;
 	_HashNode *n = _Get(key, HashObj(key) & (_numofnodes - 1));
 	if (n) {
@@ -93,7 +101,7 @@ bool SQTable::Get(const SQObjectPtr &key,SQObjectPtr &val)
 }
 bool SQTable::NewSlot(const SQObjectPtr &key,const SQObjectPtr &val)
 {
-	assert(type(key) != OT_NULL);
+	assert(sqtype(key) != OT_NULL);
 	SQHash h = HashObj(key) & (_numofnodes - 1);
 	_HashNode *n = _Get(key, h);
 	if (n) {
@@ -107,7 +115,7 @@ bool SQTable::NewSlot(const SQObjectPtr &key,const SQObjectPtr &val)
 	//key not found I'll insert it
 	//main pos is not free
 
-	if(type(mp->key) != OT_NULL) {
+	if(sqtype(mp->key) != OT_NULL) {
 		n = _firstfree;  /* get a free place */
 		SQHash mph = HashObj(mp->key) & (_numofnodes - 1);
 		_HashNode *othern;  /* main position of colliding node */
@@ -136,7 +144,7 @@ bool SQTable::NewSlot(const SQObjectPtr &key,const SQObjectPtr &val)
 	mp->key = key;
 
 	for (;;) {  /* correct `firstfree' */
-		if (type(_firstfree->key) == OT_NULL && _firstfree->next == NULL) {
+		if (sqtype(_firstfree->key) == OT_NULL && _firstfree->next == NULL) {
 			mp->val = val;
 			_usednodes++;
 			return true;  /* OK; table still has a free place */
@@ -152,7 +160,7 @@ SQInteger SQTable::Next(bool getweakrefs,const SQObjectPtr &refpos, SQObjectPtr 
 {
 	SQInteger idx = (SQInteger)TranslateIndex(refpos);
 	while (idx < _numofnodes) {
-		if(type(_nodes[idx].key) != OT_NULL) {
+		if(sqtype(_nodes[idx].key) != OT_NULL) {
 			//first found
 			_HashNode &n = _nodes[idx];
 			outkey = n.key;

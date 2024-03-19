@@ -12,6 +12,10 @@
 #endif
 
 #ifdef _DEBUG
+// #define DEBUG_NNAMES_LOG
+#endif
+
+#ifdef DEBUG_NNAMES_LOG
 #include <stdio.h>
 
 static const SQChar *g_nnames[] =
@@ -479,7 +483,7 @@ static const SQChar *sqstd_rex_matchnode(SQRex* exp,SQRexNode *node,const SQChar
 			} while((n->next != -1) && (n = &exp->_nodes[n->next]));
 
 			if(capture != -1) 
-				exp->_matches[capture].len = cur - exp->_matches[capture].begin;
+				exp->_matches[capture].len = (SQInteger)(cur - exp->_matches[capture].begin);
 			return cur;
 	}				 
 	case OP_WB:
@@ -540,7 +544,7 @@ SQRex *sqstd_rex_compile(const SQChar *pattern,const SQChar **error)
 		exp->_nodes[exp->_first].left = res;
 		if(*exp->_p!='\0')
 			sqstd_rex_error(exp,_SC("unexpected character"));
-#ifdef _DEBUG
+#ifdef DEBUG_NNAMES_LOG
 		{
 			SQInteger nsize,i;
 			SQRexNode *t;

@@ -160,6 +160,7 @@ public:
 
 		SQFuncState funcstate(_ss(_vm), NULL,ThrowError,this);
 		funcstate._name = SQString::Create(_ss(_vm), _SC("main"));
+		funcstate._varparams = true;
 		_fs = &funcstate;
 		_fs->AddParameter(_fs->CreateString(_SC("this")));
 		_fs->_sourcename = _sourcename;
@@ -181,7 +182,7 @@ public:
 		}
 		else {
 			if(_raiseerror && _ss(_vm)->_compilererrorhandler) {
-				_ss(_vm)->_compilererrorhandler(_vm, compilererror, type(_sourcename) == OT_STRING?_stringval(_sourcename):_SC("unknown"),
+				_ss(_vm)->_compilererrorhandler(_vm, compilererror, sqtype(_sourcename) == OT_STRING?_stringval(_sourcename):_SC("unknown"),
 					_lex._currentline, _lex._currentcolumn);
 			}
 			_vm->_lasterror = SQString::Create(_ss(_vm), compilererror, -1);
@@ -634,7 +635,7 @@ public:
 					else if(_fs->IsConstant(id,constant)) { //line 634
 						SQObjectPtr constval;
 						SQObject constid;
-						if(type(constant) == OT_TABLE) {
+						if(sqtype(constant) == OT_TABLE) {
 							Expect('.'); constid = Expect(TK_IDENTIFIER);
 							if(!_table(constant)->Get(constid,constval)) {
 								constval.Null();
@@ -645,13 +646,13 @@ public:
 							constval = constant;
 						}
 						_exst._deref = _fs->PushTarget();
-						SQObjectType ctype = type(constval);
+						SQObjectType ctype = sqtype(constval);
 						if(ctype == OT_INTEGER && (_integer(constval) & (~0x7FFFFFFF)) == 0) {
 							_fs->AddInstruction(_OP_LOADINT, _exst._deref,_integer(constval));
 						}
-						else if(ctype == OT_FLOAT && sizeof(SQFloat) == sizeof(SQInt32)) {
+						else if(ctype == OT_FLOAT && sizeof(SQFloat) == sizeof(SQInteger)) {
 							SQFloat f = _float(constval);
-							_fs->AddInstruction(_OP_LOADFLOAT, _exst._deref,*((SQInt32 *)&f));
+							_fs->AddInstruction(_OP_LOADFLOAT, _exst._deref,*((SQInteger *)&f));
 						}
 						else {
 							_fs->AddInstruction(_OP_LOAD, _exst._deref, _fs->GetConstant(constval));
@@ -696,8 +697,8 @@ public:
 						 }
 			break;
 		case TK_FLOAT:
-			if(sizeof(SQFloat) == sizeof(SQInt32)) {
-				_fs->AddInstruction(_OP_LOADFLOAT, _fs->PushTarget(),*((SQInt32 *)&_lex._fvalue));
+			if(sizeof(SQFloat) == sizeof(SQInteger)) {
+				_fs->AddInstruction(_OP_LOADFLOAT, _fs->PushTarget(),*((SQInteger *)&_lex._fvalue));
 			}
 			else {
 				_fs->AddInstruction(_OP_LOAD, _fs->PushTarget(), _fs->GetNumericConstant(_lex._fvalue));
@@ -840,18 +841,32 @@ public:
 	{
 		SQObject varname;
 		do {
-			Lex(); varname = Expect(TK_IDENTIFIER);
-			if(_token == _SC('=')) {
-				Lex(); Expression();
+			Lex();
+			if(_token == TK_FUNCTION) {
+				Lex();
+				varname = Expect(TK_IDENTIFIER);
+				Expect(_SC('('));
+				CreateFunction(_null_);
+				_fs->AddInstruction(_OP_CLOSURE, _fs->PushTarget(), _fs->_functions.size() - 1,0);
 				SQInteger src = _fs->PopTarget();
 				SQInteger dest = _fs->PushTarget();
 				if(dest != src) _fs->AddInstruction(_OP_MOVE, dest, src);
+				_fs->PopTarget();
+				_fs->PushLocalVariable(varname);
+			} else {
+				varname = Expect(TK_IDENTIFIER);
+				if(_token == _SC('=')) {
+					Lex(); Expression();
+					SQInteger src = _fs->PopTarget();
+					SQInteger dest = _fs->PushTarget();
+					if(dest != src) _fs->AddInstruction(_OP_MOVE, dest, src);
+				}
+				else{
+					_fs->AddInstruction(_OP_LOADNULLS, _fs->PushTarget(),1);
+				}
+				_fs->PopTarget();
+				_fs->PushLocalVariable(varname);
 			}
-			else{
-				_fs->AddInstruction(_OP_LOADNULLS, _fs->PushTarget(),1);
-			}
-			_fs->PopTarget();
-			_fs->PushLocalVariable(varname);
 		
 		} while(_token == _SC(','));
 	}

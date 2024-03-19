@@ -39,28 +39,90 @@ extern "C" {
 #define SQUIRREL_API extern
 #endif
 
-#if (defined(_WIN64) || defined(_LP64))
-#define _SQ64
-#endif
 
-#ifdef _SQ64
-#ifdef _MSC_VER
-typedef __int64 SQInteger;
-typedef unsigned __int64 SQUnsignedInteger;
-typedef unsigned __int64 SQHash; /*should be the same size of a pointer*/
-#else
-typedef long SQInteger;
-typedef unsigned long SQUnsignedInteger;
-typedef unsigned long SQHash; /*should be the same size of a pointer*/
-#endif
-typedef int SQInt32; 
-#else 
+// =============================================================
+// 64bit環境の自動判定
+// 64bit環境では_SQ64が定義されます。
+// SQInteger/SQUnsignedIntegerは常に32bitです。
+// SQHashはポインタと同じサイズが必要です。
+// SQIntPtrはポインタと同じサイズが必要です。
+
+#if defined(_WIN64)
+#define _SQ64
 typedef int SQInteger;
-typedef int SQInt32; /*must be 32 bits(also on 64bits processors)*/
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned __int64 SQHash; /*should be the same size of a pointer*/
+typedef __int64 SQIntPtr;
+// #warning _WIN64
+
+#elif defined(_LP64)
+#define _SQ64
+typedef int SQInteger;
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned long long SQHash; /*should be the same size of a pointer*/
+typedef long long SQIntPtr;
+// #warning _LP64
+
+#elif defined(_LLP64)
+#define _SQ64
+typedef int SQInteger;
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned long long SQHash; /*should be the same size of a pointer*/
+typedef long long SQIntPtr;
+// #warning _LLP64
+
+#elif defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && defined(__x86_64__)
+#define _SQ64
+typedef int SQInteger;
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned long long SQHash; /*should be the same size of a pointer*/
+typedef long long SQIntPtr;
+// #warning __x86_64__
+
+#elif defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && defined(__arm64__)
+#define _SQ64
+typedef int SQInteger;
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned long long SQHash; /*should be the same size of a pointer*/
+typedef long long SQIntPtr;
+//#warning __arm64__
+
+#elif defined(NN_BUILD_CONFIG_ABI_SUPPORTS_LP64)
+#define _SQ64
+typedef int SQInteger;
+typedef unsigned int SQUnsignedInteger;
+typedef unsigned __int64 SQHash; /*should be the same size of a pointer*/
+typedef __int64 SQIntPtr;
+// #warning NN_BUILD_CONFIG_ABI_SUPPORTS_LP64
+
+#else
+typedef int SQInteger;
 typedef unsigned int SQUnsignedInteger;
 typedef unsigned int SQHash; /*should be the same size of a pointer*/
+typedef int SQIntPtr;
+//#warning not SQ64
+
 #endif
 
+// =============================================================
+// SQLongのサイズ設定
+// 32bitでSQLONG_32BITが定義されたとき、SQLongは32bitになります。
+// それ以外では64bitになります。
+
+#if !defined(_SQ64) && defined(SQLONG_32BIT)
+typedef long SQLong;
+#else
+#ifdef _MSC_VER
+typedef __int64 SQLong;
+#else
+typedef long long SQLong;
+#endif
+#endif
+
+// =============================================================
+// SQFloatのサイズ設定
+// SQUSEDOUBLEが定義されたとき、SQFloatは64bitになります。
+// それ以外では、SQFloatは32bitになります。
 
 #ifdef SQUSEDOUBLE
 typedef double SQFloat;
@@ -68,21 +130,29 @@ typedef double SQFloat;
 typedef float SQFloat;
 #endif
 
-#if defined(SQUSEDOUBLE) && !defined(_SQ64)
+// =============================================================
+// squirrelの最大データサイズ設定
+// SQIntPtr/SQLong/SQFloatのうち、どれかひとつでも64bitなら
+// SQRawObjectValは64bitになります。
+// すべてが32bitなら、SQRawObjectValは32bitになります。
+
+#if defined(_SQ64) || !defined(SQLONG_32BIT) || defined(SQUSEDOUBLE)
 #ifdef _MSC_VER
-typedef __int64 SQRawObjectVal; //must be 64bits
+typedef __int64 SQRawObjectVal;
 #else
-typedef long SQRawObjectVal; //must be 64bits
+typedef long long SQRawObjectVal;
+#endif
+#else
+typedef long SQRawObjectVal;
 #endif
 #define SQ_OBJECT_RAWINIT() { _unVal.raw = 0; }
-#else
-typedef SQUnsignedInteger SQRawObjectVal; //is 32 bits on 32 bits builds and 64 bits otherwise
-#define SQ_OBJECT_RAWINIT()
-#endif
+
+// =============================================================
 
 typedef void* SQUserPointer;
 typedef SQUnsignedInteger SQBool;
 typedef SQInteger SQRESULT;
+typedef SQIntPtr SQSize;
 
 #define SQTrue	(1)
 #define SQFalse	(0)
@@ -119,6 +189,7 @@ typedef unsigned short wchar_t;
 typedef wchar_t SQChar;
 #define _SC(a) L##a
 #define	scstrcmp	wcscmp
+#define	scstrncmp	wcsncmp
 #define scsprintf	swprintf
 #define scstrlen	wcslen
 #define scstrtod	wcstod
@@ -126,6 +197,7 @@ typedef wchar_t SQChar;
 #define scatoi		_wtoi
 #define scstrtoul	wcstoul
 #define scvsprintf	vswprintf
+#define scvsnprintf	vsnwprintf
 #define scstrstr	wcsstr
 #define scisspace	iswspace
 #define scisdigit	iswdigit
@@ -134,11 +206,14 @@ typedef wchar_t SQChar;
 #define sciscntrl	iswcntrl
 #define scisalnum	iswalnum
 #define scprintf	wprintf
+#define scstrcpy	wcscpy
+#define scstrncpy	wcsncpy
 #define MAX_CHAR 0xFFFF
 #else
 typedef char SQChar;
 #define _SC(a) a
 #define	scstrcmp	strcmp
+#define	scstrncmp	strncmp
 #define scsprintf	sprintf
 #define scstrlen	strlen
 #define scstrtod	strtod
@@ -146,6 +221,7 @@ typedef char SQChar;
 #define scatoi		atoi
 #define scstrtoul	strtoul
 #define scvsprintf	vsprintf
+#define scvsnprintf	vsnprintf
 #define scstrstr	strstr
 #define scisspace	isspace
 #define scisdigit	isdigit
@@ -154,6 +230,8 @@ typedef char SQChar;
 #define scisalpha	isalpha
 #define scisalnum	isalnum
 #define scprintf	printf
+#define scstrcpy	strcpy
+#define scstrncpy	strncpy
 #define MAX_CHAR 0xFF
 #endif
 
@@ -195,6 +273,7 @@ typedef char SQChar;
 #define _RT_CLASS			0x00004000
 #define _RT_INSTANCE		0x00008000
 #define _RT_WEAKREF			0x00010000
+#define _RT_LONG			0x00020000
 
 typedef enum tagSQObjectType{
 	OT_NULL =			(_RT_NULL|SQOBJECT_CANBEFALSE),
@@ -213,7 +292,8 @@ typedef enum tagSQObjectType{
 	OT_FUNCPROTO =		(_RT_FUNCPROTO|SQOBJECT_REF_COUNTED), //internal usage only
 	OT_CLASS =			(_RT_CLASS|SQOBJECT_REF_COUNTED),
 	OT_INSTANCE =		(_RT_INSTANCE|SQOBJECT_REF_COUNTED|SQOBJECT_DELEGABLE),
-	OT_WEAKREF =		(_RT_WEAKREF|SQOBJECT_REF_COUNTED)
+	OT_WEAKREF =		(_RT_WEAKREF|SQOBJECT_REF_COUNTED),
+	OT_LONG =			(_RT_LONG|SQOBJECT_NUMERIC|SQOBJECT_CANBEFALSE),
 }SQObjectType;
 
 #define ISREFCOUNTED(t) (t&SQOBJECT_REF_COUNTED)
@@ -229,6 +309,7 @@ typedef union tagSQObjectValue
 	struct SQString *pString;
 	struct SQUserData *pUserData;
 	SQInteger nInteger;
+	SQLong nLong;
 	SQFloat fFloat;
 	SQUserPointer pUserPointer;
 	struct SQFunctionProto *pFunctionProto;
@@ -289,6 +370,8 @@ SQUIRREL_API void sq_setforeignptr(HSQUIRRELVM v,SQUserPointer p);
 SQUIRREL_API SQUserPointer sq_getforeignptr(HSQUIRRELVM v);
 SQUIRREL_API void sq_setprintfunc(HSQUIRRELVM v, SQPRINTFUNCTION printfunc);
 SQUIRREL_API SQPRINTFUNCTION sq_getprintfunc(HSQUIRRELVM v);
+SQUIRREL_API void sq_setprinterrfunc(HSQUIRRELVM v, SQPRINTFUNCTION printfunc);
+SQUIRREL_API SQPRINTFUNCTION sq_getprinterrfunc(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_suspendvm(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_wakeupvm(HSQUIRRELVM v,SQBool resumedret,SQBool retval,SQBool raiseerror,SQBool throwerror);
 SQUIRREL_API SQInteger sq_getvmstate(HSQUIRRELVM v);
@@ -318,9 +401,12 @@ SQUIRREL_API void sq_newarray(HSQUIRRELVM v,SQInteger size);
 SQUIRREL_API void sq_newclosure(HSQUIRRELVM v,SQFUNCTION func,SQUnsignedInteger nfreevars);
 SQUIRREL_API SQRESULT sq_setparamscheck(HSQUIRRELVM v,SQInteger nparamscheck,const SQChar *typemask);
 SQUIRREL_API SQRESULT sq_bindenv(HSQUIRRELVM v,SQInteger idx);
+SQUIRREL_API SQRESULT sq_getenv(HSQUIRRELVM v,SQInteger idx);
+SQUIRREL_API SQBool sq_hasenv(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API void sq_pushstring(HSQUIRRELVM v,const SQChar *s,SQInteger len);
 SQUIRREL_API void sq_pushfloat(HSQUIRRELVM v,SQFloat f);
 SQUIRREL_API void sq_pushinteger(HSQUIRRELVM v,SQInteger n);
+SQUIRREL_API void sq_pushlong(HSQUIRRELVM v,SQLong n);
 SQUIRREL_API void sq_pushbool(HSQUIRRELVM v,SQBool b);
 SQUIRREL_API void sq_pushuserpointer(HSQUIRRELVM v,SQUserPointer p);
 SQUIRREL_API void sq_pushnull(HSQUIRRELVM v);
@@ -332,6 +418,7 @@ SQUIRREL_API void sq_tostring(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API void sq_tobool(HSQUIRRELVM v, SQInteger idx, SQBool *b);
 SQUIRREL_API SQRESULT sq_getstring(HSQUIRRELVM v,SQInteger idx,const SQChar **c);
 SQUIRREL_API SQRESULT sq_getinteger(HSQUIRRELVM v,SQInteger idx,SQInteger *i);
+SQUIRREL_API SQRESULT sq_getlong(HSQUIRRELVM v,SQInteger idx,SQLong *l);
 SQUIRREL_API SQRESULT sq_getfloat(HSQUIRRELVM v,SQInteger idx,SQFloat *f);
 SQUIRREL_API SQRESULT sq_getbool(HSQUIRRELVM v,SQInteger idx,SQBool *b);
 SQUIRREL_API SQRESULT sq_getthread(HSQUIRRELVM v,SQInteger idx,HSQUIRRELVM *thread);
@@ -361,10 +448,12 @@ SQUIRREL_API void sq_pushregistrytable(HSQUIRRELVM v);
 SQUIRREL_API void sq_pushconsttable(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_setroottable(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_setconsttable(HSQUIRRELVM v);
+SQUIRREL_API SQRESULT sq_setexceptionclass(HSQUIRRELVM v);
 SQUIRREL_API SQRESULT sq_newslot(HSQUIRRELVM v, SQInteger idx, SQBool bstatic);
 SQUIRREL_API SQRESULT sq_deleteslot(HSQUIRRELVM v,SQInteger idx,SQBool pushval);
 SQUIRREL_API SQRESULT sq_set(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_get(HSQUIRRELVM v,SQInteger idx);
+SQUIRREL_API SQBool sq_exists(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawget(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawset(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_rawdeleteslot(HSQUIRRELVM v,SQInteger idx,SQBool pushval);
@@ -374,6 +463,7 @@ SQUIRREL_API SQRESULT sq_arrayresize(HSQUIRRELVM v,SQInteger idx,SQInteger newsi
 SQUIRREL_API SQRESULT sq_arrayreverse(HSQUIRRELVM v,SQInteger idx); 
 SQUIRREL_API SQRESULT sq_arrayremove(HSQUIRRELVM v,SQInteger idx,SQInteger itemidx);
 SQUIRREL_API SQRESULT sq_arrayinsert(HSQUIRRELVM v,SQInteger idx,SQInteger destpos);
+SQUIRREL_API SQRESULT sq_arrayremovevalue(HSQUIRRELVM v,SQInteger idx,SQBool all);
 SQUIRREL_API SQRESULT sq_setdelegate(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_getdelegate(HSQUIRRELVM v,SQInteger idx);
 SQUIRREL_API SQRESULT sq_clone(HSQUIRRELVM v,SQInteger idx);
@@ -387,9 +477,13 @@ SQUIRREL_API SQRESULT sq_call(HSQUIRRELVM v,SQInteger params,SQBool retval,SQBoo
 SQUIRREL_API SQRESULT sq_resume(HSQUIRRELVM v,SQBool retval,SQBool raiseerror);
 SQUIRREL_API const SQChar *sq_getlocal(HSQUIRRELVM v,SQUnsignedInteger level,SQUnsignedInteger idx);
 SQUIRREL_API const SQChar *sq_getfreevariable(HSQUIRRELVM v,SQInteger idx,SQUnsignedInteger nval);
-SQUIRREL_API SQRESULT sq_throwerror(HSQUIRRELVM v,const SQChar *err);
+SQUIRREL_API SQRESULT sq_throwerror(HSQUIRRELVM v,const SQChar *err, ...);
+SQUIRREL_API SQRESULT sq_throwobj(HSQUIRRELVM v,HSQOBJECT obj);
 SQUIRREL_API void sq_reseterror(HSQUIRRELVM v);
 SQUIRREL_API void sq_getlasterror(HSQUIRRELVM v);
+
+SQUIRREL_API SQRESULT sq_execscript(HSQUIRRELVM v, const SQChar *src, SQInteger size, SQInteger contextIdx, SQInteger errorIdx);
+SQUIRREL_API SQRESULT sq_template(HSQUIRRELVM v, const SQChar *text, SQInteger size, SQInteger contextidx, SQInteger erroridx);
 
 /*raw object handling*/
 SQUIRREL_API SQRESULT sq_getstackobj(HSQUIRRELVM v,SQInteger idx,HSQOBJECT *po);
@@ -400,6 +494,7 @@ SQUIRREL_API void sq_resetobject(HSQOBJECT *po);
 SQUIRREL_API const SQChar *sq_objtostring(HSQOBJECT *o);
 SQUIRREL_API SQBool sq_objtobool(HSQOBJECT *o);
 SQUIRREL_API SQInteger sq_objtointeger(HSQOBJECT *o);
+SQUIRREL_API SQLong sq_objtolong(HSQOBJECT *o);
 SQUIRREL_API SQFloat sq_objtofloat(HSQOBJECT *o);
 SQUIRREL_API SQRESULT sq_getobjtypetag(HSQOBJECT *o,SQUserPointer * typetag);
 
@@ -407,7 +502,10 @@ SQUIRREL_API SQRESULT sq_getobjtypetag(HSQOBJECT *o,SQUserPointer * typetag);
 SQUIRREL_API SQInteger sq_collectgarbage(HSQUIRRELVM v);
 
 /*serialization*/
-SQUIRREL_API SQRESULT sq_writeclosure(HSQUIRRELVM vm,SQWRITEFUNC writef,SQUserPointer up);
+#define SQ_DEFAULT_ENDIAN 0
+#define SQ_LITTLE_ENDIAN 1
+#define SQ_BIG_ENDIAN 2
+SQUIRREL_API SQRESULT sq_writeclosure(HSQUIRRELVM vm,SQWRITEFUNC writef,SQUserPointer up, SQInteger endian);
 SQUIRREL_API SQRESULT sq_readclosure(HSQUIRRELVM vm,SQREADFUNC readf,SQUserPointer up);
 
 /*mem allocation*/
@@ -446,8 +544,8 @@ SQUIRREL_API void sq_setdebughook(HSQUIRRELVM v);
 #define SQ_OK (0)
 #define SQ_ERROR (-1)
 
-#define SQ_FAILED(res) (res<0)
-#define SQ_SUCCEEDED(res) (res>=0)
+#define SQ_FAILED(res) ((res)<0)
+#define SQ_SUCCEEDED(res) ((res)>=0)
 
 #ifdef __cplusplus
 } /*extern "C"*/

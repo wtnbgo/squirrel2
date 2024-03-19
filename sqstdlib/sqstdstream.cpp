@@ -44,13 +44,13 @@ SQInteger _stream_readn(HSQUIRRELVM v)
 	sq_getinteger(v, 2, &format);
 	switch(format) {
 	case 'l': {
-		SQInteger i;
-		SAFE_READN(&i, sizeof(i));
-		sq_pushinteger(v, i);
+		SQLong l;
+		SAFE_READN(&l, sizeof(l));
+		sq_pushlong(v, l);
 			  }
 		break;
 	case 'i': {
-		SQInt32 i;
+		SQInteger i;
 		SAFE_READN(&i, sizeof(i));
 		sq_pushinteger(v, i);
 			  }
@@ -119,17 +119,16 @@ SQInteger _stream_writen(HSQUIRRELVM v)
 	sq_getinteger(v, 3, &format);
 	switch(format) {
 	case 'l': {
-		SQInteger i;
-		sq_getinteger(v, 2, &ti);
-		i = ti;
-		self->Write(&i, sizeof(SQInteger));
+		SQLong l;
+		sq_getlong(v, 2, &l);
+		self->Write(&l, sizeof(SQLong));
 			  }
 		break;
 	case 'i': {
-		SQInt32 i;
+		SQInteger i;
 		sq_getinteger(v, 2, &ti);
-		i = (SQInt32)ti;
-		self->Write(&i, sizeof(SQInt32));
+		i = (SQInteger)ti;
+		self->Write(&i, sizeof(SQInteger));
 			  }
 		break;
 	case 's': {

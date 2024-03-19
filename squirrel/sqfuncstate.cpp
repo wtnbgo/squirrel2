@@ -76,12 +76,21 @@ SQInstructionDesc g_InstrDesc[]={
 #endif
 void DumpLiteral(SQObjectPtr &o)
 {
-	switch(type(o)){
+	switch(sqtype(o)){
 		case OT_STRING:	scprintf(_SC("\"%s\""),_stringval(o));break;
 		case OT_FLOAT: scprintf(_SC("{%f}"),_float(o));break;
 		case OT_INTEGER: scprintf(_SC("{%d}"),_integer(o));break;
+#if !defined(_SQ64) && defined(SQLONG_32BIT)
+		case OT_LONG: scprintf(_SC("{%ld}"),_long(o));break;
+#else
+		case OT_LONG: scprintf(_SC("{%lld}"),_long(o));break;
+#endif
 		case OT_BOOL: scprintf(_SC("%s"),_integer(o)?_SC("true"):_SC("false"));break;
-		default: scprintf(_SC("(%s %p)"),GetTypeName(o),_rawval(o));break; break; //shut up compiler
+#if defined(_SQ64) || !defined(SQLONG_32BIT) || defined(SQUSEDOUBLE)
+		default: scprintf(_SC("(%s %llx)"),GetTypeName(o),_rawval(o));break; break; //shut up compiler
+#else
+		default: scprintf(_SC("(%s %lx)"),GetTypeName(o),_rawval(o));break; break; //shut up compiler
+#endif
 	}
 }
 
@@ -114,10 +123,11 @@ void SQFuncState::Dump(SQFunctionProto *func)
 {
 	SQUnsignedInteger n=0,i;
 	SQInteger si;
+	SQObject obj = {};
 	scprintf(_SC("SQInstruction sizeof %d\n"),sizeof(SQInstruction));
-	scprintf(_SC("SQObject sizeof %d\n"),sizeof(SQObject));
+	scprintf(_SC("SQObject sizeof %ld, _type sizeof %ld, _unVal sizeof %ld\n"),sizeof(obj), sizeof(obj._type), sizeof(obj._unVal));
 	scprintf(_SC("--------------------------------------------------------------------\n"));
-	scprintf(_SC("*****FUNCTION [%s]\n"),type(func->_name)==OT_STRING?_stringval(func->_name):_SC("unknown"));
+	scprintf(_SC("*****FUNCTION [%s]\n"),sqtype(func->_name)==OT_STRING?_stringval(func->_name):_SC("unknown"));
 	scprintf(_SC("-----LITERALS\n"));
 	SQObjectPtr refidx,key,val;
 	SQInteger idx;
@@ -237,7 +247,7 @@ SQInteger SQFuncState::GetConstant(const SQObject &cons)
 void SQFuncState::SetIntructionParams(SQInteger pos,SQInteger arg0,SQInteger arg1,SQInteger arg2,SQInteger arg3)
 {
 	_instructions[pos]._arg0=(unsigned char)*((SQUnsignedInteger *)&arg0);
-	_instructions[pos]._arg1=(SQInt32)*((SQUnsignedInteger *)&arg1);
+	_instructions[pos]._arg1=(SQInteger)*((SQUnsignedInteger *)&arg1);
 	_instructions[pos]._arg2=(unsigned char)*((SQUnsignedInteger *)&arg2);
 	_instructions[pos]._arg3=(unsigned char)*((SQUnsignedInteger *)&arg3);
 }
@@ -246,7 +256,7 @@ void SQFuncState::SetIntructionParam(SQInteger pos,SQInteger arg,SQInteger val)
 {
 	switch(arg){
 		case 0:_instructions[pos]._arg0=(unsigned char)*((SQUnsignedInteger *)&val);break;
-		case 1:case 4:_instructions[pos]._arg1=(SQInt32)*((SQUnsignedInteger *)&val);break;
+		case 1:case 4:_instructions[pos]._arg1=(SQInteger)*((SQUnsignedInteger *)&val);break;
 		case 2:_instructions[pos]._arg2=(unsigned char)*((SQUnsignedInteger *)&val);break;
 		case 3:_instructions[pos]._arg3=(unsigned char)*((SQUnsignedInteger *)&val);break;
 	};
@@ -285,7 +295,7 @@ SQInteger SQFuncState::PopTarget()
 {
 	SQInteger npos=_targetstack.back();
 	SQLocalVarInfo t=_vlocals[_targetstack.back()];
-	if(type(t._name)==OT_NULL){
+	if(sqtype(t._name)==OT_NULL){
 		_vlocals.pop_back();
 	}
 	_targetstack.pop_back();
@@ -303,7 +313,7 @@ void SQFuncState::SetStackSize(SQInteger n)
 	while(size>n){
 		size--;
 		SQLocalVarInfo lvi=_vlocals.back();
-		if(type(lvi._name)!=OT_NULL){
+		if(sqtype(lvi._name)!=OT_NULL){
 			lvi._end_op=GetCurrentPos();
 			_localvarinfos.push_back(lvi);
 		}
@@ -324,7 +334,7 @@ bool SQFuncState::IsConstant(const SQObject &name,SQObject &e)
 bool SQFuncState::IsLocal(SQUnsignedInteger stkpos)
 {
 	if(stkpos>=_vlocals.size())return false;
-	else if(type(_vlocals[stkpos]._name)!=OT_NULL)return true;
+	else if(sqtype(_vlocals[stkpos]._name)!=OT_NULL)return true;
 	return false;
 }
 
@@ -345,7 +355,7 @@ SQInteger SQFuncState::GetLocalVariable(const SQObject &name)
 {
 	SQInteger locals=_vlocals.size();
 	while(locals>=1){
-		if(type(_vlocals[locals-1]._name)==OT_STRING && _string(_vlocals[locals-1]._name)==_string(name)){
+		if(sqtype(_vlocals[locals-1]._name)==OT_STRING && _string(_vlocals[locals-1]._name)==_string(name)){
 			return locals-1;
 		}
 		locals--;

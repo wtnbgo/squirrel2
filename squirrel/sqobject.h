@@ -7,6 +7,7 @@
 #define SQ_CLOSURESTREAM_HEAD (('S'<<24)|('Q'<<16)|('I'<<8)|('R'))
 #define SQ_CLOSURESTREAM_PART (('P'<<24)|('A'<<16)|('R'<<8)|('T'))
 #define SQ_CLOSURESTREAM_TAIL (('T'<<24)|('A'<<16)|('I'<<8)|('L'))
+#define SQ_CLOSURESTREAM_HEAD_REVERSE (('S')|('Q'<<8)|('I'<<16)|('R'<<24))
 
 struct SQSharedState;
 
@@ -29,7 +30,8 @@ enum SQMetaMethod{
 	MT_TOSTRING=15,
 	MT_NEWMEMBER=16,
 	MT_INHERITED=17,
-	MT_LAST = 18
+	MT_EXIST=18,
+	MT_LAST = 19
 };
 
 #define MM_ADD		_SC("_add")
@@ -50,6 +52,7 @@ enum SQMetaMethod{
 #define MM_TOSTRING	_SC("_tostring")
 #define MM_NEWMEMBER _SC("_newmember")
 #define MM_INHERITED _SC("_inherited")
+#define MM_EXIST _SC("_exist")
 
 #define MINPOWER2 4
 
@@ -69,7 +72,7 @@ struct SQWeakRef : SQRefCounted
 	SQObject _obj;
 };
 
-#define _realval(o) (type((o)) != OT_WEAKREF?(SQObject)o:_weakref(o)->_obj)
+#define _realval(o) (sqtype((o)) != OT_WEAKREF?(SQObject)o:_weakref(o)->_obj)
 
 struct SQObjectPtr;
 
@@ -96,11 +99,12 @@ struct SQObjectPtr;
 	(obj)->_uiRef++; \
 }
 
-#define type(obj) ((obj)._type)
-#define is_delegable(t) (type(t)&SQOBJECT_DELEGABLE)
+#define sqtype(obj) ((obj)._type)
+#define is_delegable(t) (sqtype(t)&SQOBJECT_DELEGABLE)
 #define raw_type(obj) _RAW_TYPE((obj)._type)
 
 #define _integer(obj) ((obj)._unVal.nInteger)
+#define _long(obj) ((obj)._unVal.nLong)
 #define _float(obj) ((obj)._unVal.fFloat)
 #define _string(obj) ((obj)._unVal.pString)
 #define _table(obj) ((obj)._unVal.pTable)
@@ -122,8 +126,9 @@ struct SQObjectPtr;
 #define _stringval(obj) (obj)._unVal.pString->_val
 #define _userdataval(obj) (obj)._unVal.pUserData->_val
 
-#define tofloat(num) ((type(num)==OT_INTEGER)?(SQFloat)_integer(num):_float(num))
-#define tointeger(num) ((type(num)==OT_FLOAT)?(SQInteger)_float(num):_integer(num))
+#define tofloat(num) ((sqtype(num)==OT_INTEGER)?(SQFloat)_integer(num):((sqtype(num)==OT_LONG)?(SQFloat)_long(num):_float(num)))
+#define tointeger(num) ((sqtype(num)==OT_FLOAT)?(SQInteger)_float(num):_integer(num))
+#define tolong(num) ((sqtype(num)==OT_FLOAT)?(SQLong)_float(num):_long(num))
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 struct SQObjectPtr : public SQObject
@@ -250,6 +255,12 @@ struct SQObjectPtr : public SQObject
 		_type=OT_INTEGER;
 		_unVal.nInteger=nInteger;
 	}
+	SQObjectPtr(SQLong nLong)
+	{
+		SQ_OBJECT_RAWINIT()
+		_type=OT_LONG;
+		_unVal.nLong=nLong;
+	}
 	SQObjectPtr(SQFloat fFloat)
 	{
 		SQ_OBJECT_RAWINIT()
@@ -285,13 +296,26 @@ struct SQObjectPtr : public SQObject
 	inline SQObjectPtr& operator=(SQInteger i)
 	{ 
 		__Release(_type,_unVal);
+#if defined(_SQ64)
+		_unVal.raw = 0;
+#endif
 		_unVal.nInteger = i;
 		_type = OT_INTEGER;
+		return *this;
+	}
+	inline SQObjectPtr& operator=(SQLong i)
+	{ 
+		__Release(_type,_unVal);
+		_unVal.nLong = i;
+		_type = OT_LONG;
 		return *this;
 	}
 	inline SQObjectPtr& operator=(SQFloat f)
 	{ 
 		__Release(_type,_unVal);
+#if defined(_SQ64)
+		_unVal.raw = 0;
+#endif
 		_unVal.fFloat = f;
 		_type = OT_FLOAT;
 		return *this;

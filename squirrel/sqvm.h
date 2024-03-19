@@ -2,6 +2,7 @@
 #ifndef _SQVM_H_
 #define _SQVM_H_
 
+#include <stdarg.h>
 #include "sqopcodes.h"
 #include "sqobject.h"
 #define MAX_NATIVE_CALLS 100
@@ -39,14 +40,15 @@ struct SQVM : public CHAINABLE_OBJ
 	struct CallInfo{
 		//CallInfo() { _generator._type = OT_NULL;}
 		SQInstruction *_ip;
+		// SQInstruction *_ipstart;
 		SQObjectPtr *_literals;
 		SQObjectPtr _closure;
 		SQGenerator *_generator;
-		SQInt32 _etraps;
-		SQInt32 _prevstkbase;
-		SQInt32 _prevtop;
-		SQInt32 _target;
-		SQInt32 _ncalls;
+		SQInteger _etraps;
+		SQInteger _prevstkbase;
+		SQInteger _prevtop;
+		SQInteger _target;
+		SQInteger _ncalls;
 		SQBool _root;
 		VarArgs _vargs;
 	};
@@ -69,6 +71,8 @@ public:
 
 	void CallDebugHook(SQInteger type,SQInteger forcedline=0);
 	void CallErrorHandler(SQObjectPtr &e);
+	bool Exist(const SQObjectPtr &self, const SQObjectPtr &key);
+	bool FallBackExist(const SQObjectPtr &self,const SQObjectPtr &key);
 	bool Get(const SQObjectPtr &self, const SQObjectPtr &key, SQObjectPtr &dest, bool raw, bool fetchroot);
 	bool FallBackGet(const SQObjectPtr &self,const SQObjectPtr &key,SQObjectPtr &dest,bool raw);
 	bool Set(const SQObjectPtr &self, const SQObjectPtr &key, const SQObjectPtr &val, bool fetchroot);
@@ -82,8 +86,10 @@ public:
 	SQString *PrintObjVal(const SQObject &o);
 
  
-	void Raise_Error(const SQChar *s, ...);
+	void Raise_Error(const SQChar *s);
 	void Raise_Error(SQObjectPtr &desc);
+	void Raise_ErrorV(const SQChar *s, va_list &vl);
+	void Raise_ErrorF(const SQChar *s, ...);
 	void Raise_IdxError(SQObject &o);
 	void Raise_CompareError(const SQObject &o1, const SQObject &o2);
 	void Raise_ParamTypeError(SQInteger nparam,SQInteger typemask,SQInteger type);
