@@ -39,7 +39,7 @@ cmake でビルドできます
 
 ●ライセンス
 
-zlibライセンスの squirrel 2.2.4 からの fork になります
+zlibライセンスの squirrel 2.2 系からの fork になります
 
 squirrel/sqrat 同様 に
 zlibライセンスに従って利用してください。

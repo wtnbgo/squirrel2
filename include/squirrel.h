@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2003-2009 Alberto Demichelis
+Copyright (c) 2003-2011 Alberto Demichelis
 
 This software is provided 'as-is', without any 
 express or implied warranty. In no event will the 
@@ -235,9 +235,10 @@ typedef char SQChar;
 #define MAX_CHAR 0xFF
 #endif
 
-#define SQUIRREL_VERSION	_SC("Squirrel 2.2.4 stable")
-#define SQUIRREL_COPYRIGHT	_SC("Copyright (C) 2003-2009 Alberto Demichelis")
+#define SQUIRREL_VERSION	_SC("Squirrel 2.2.5 stable")
+#define SQUIRREL_COPYRIGHT	_SC("Copyright (C) 2003-2010 Alberto Demichelis")
 #define SQUIRREL_AUTHOR		_SC("Alberto Demichelis")
+#define SQUIRREL_VERSION_NUMBER	225
 
 #define SQ_VMSTATE_IDLE			0
 #define SQ_VMSTATE_RUNNING		1

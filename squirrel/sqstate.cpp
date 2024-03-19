@@ -103,7 +103,7 @@ void SQSharedState::Init()
 #ifndef NO_GARBAGE_COLLECTOR
 	_gc_chain=NULL;
 #endif
-	sq_new(_stringtable,StringTable);
+	sq_new(_stringtable,SQStringTable);
 	sq_new(_metamethods,SQObjectPtrVec);
 	sq_new(_systemstrings,SQObjectPtrVec);
 	sq_new(_types,SQObjectPtrVec);
@@ -164,18 +164,6 @@ void SQSharedState::Init()
 
 SQSharedState::~SQSharedState()
 {
-#ifndef NO_GARBAGE_COLLECTOR
-	SQCollectable *t = _gc_chain;
-	SQCollectable *nx = NULL;
-	while(t) {
-		t->_uiRef++;
-		t->Finalize();
-		nx = t->_next;
-		if(--t->_uiRef == 0)
-			t->Release();
-		t=nx;
-	}
-#endif
 	_constructoridx = _null_;
 	_table(_registry)->Finalize();
 	_table(_consts)->Finalize();
@@ -201,6 +189,19 @@ SQSharedState::~SQSharedState()
 	_weakref_default_delegate = _null_;
 	_refs_table.Finalize();
 #ifndef NO_GARBAGE_COLLECTOR
+	SQCollectable *t = _gc_chain;
+	SQCollectable *nx = NULL;
+	if(t) {
+		t->_uiRef++;
+		while(t) {
+			t->Finalize();
+			nx = t->_next;
+			if(nx) nx->_uiRef++;
+			if(--t->_uiRef == 0)
+				t->Release();
+			t = nx;
+		}
+	}
 	assert(_gc_chain==NULL); //just to proove a theory
 	while(_gc_chain){
 		_gc_chain->_uiRef++;
@@ -211,7 +212,7 @@ SQSharedState::~SQSharedState()
 	sq_delete(_types,SQObjectPtrVec);
 	sq_delete(_systemstrings,SQObjectPtrVec);
 	sq_delete(_metamethods,SQObjectPtrVec);
-	sq_delete(_stringtable,StringTable);
+	sq_delete(_stringtable,SQStringTable);
 	if(_scratchpad)SQ_FREE(_scratchpad,_scratchpadsize);
 }
 
@@ -271,14 +272,17 @@ SQInteger SQSharedState::CollectGarbage(SQVM *vm)
 	
 	SQCollectable *t = _gc_chain;
 	SQCollectable *nx = NULL;
-	while(t) {
+	if(t) {
 		t->_uiRef++;
+		while(t) {
 		t->Finalize();
 		nx = t->_next;
+			if(nx) nx->_uiRef++;
 		if(--t->_uiRef == 0)
 			t->Release();
 		t = nx;
 		n++;
+		}
 	}
 
 	t = tchain;
@@ -483,33 +487,33 @@ void RefTable::AllocNodes(SQUnsignedInteger size)
 	_numofslots = size;
 }
 //////////////////////////////////////////////////////////////////////////
-//StringTable
+//SQStringTable
 /*
 * The following code is based on Lua 4.0 (Copyright 1994-2002 Tecgraf, PUC-Rio.)
 * http://www.lua.org/copyright.html#4
 * http://www.lua.org/source/4.0.1/src_lstring.c.html
 */
 
-StringTable::StringTable()
+SQStringTable::SQStringTable()
 {
 	AllocNodes(4);
 	_slotused = 0;
 }
 
-StringTable::~StringTable()
+SQStringTable::~SQStringTable()
 {
 	SQ_FREE(_strings,sizeof(SQString*)*_numofslots);
 	_strings = NULL;
 }
 
-void StringTable::AllocNodes(SQInteger size)
+void SQStringTable::AllocNodes(SQInteger size)
 {
 	_numofslots = size;
 	_strings = (SQString**)SQ_MALLOC(sizeof(SQString*)*_numofslots);
 	memset(_strings,0,sizeof(SQString*)*_numofslots);
 }
 
-SQString *StringTable::Add(const SQChar *news,SQInteger len)
+SQString *SQStringTable::Add(const SQChar *news,SQInteger len)
 {
 	if(len<0)
 		len = (SQInteger)scstrlen(news);
@@ -534,7 +538,7 @@ SQString *StringTable::Add(const SQChar *news,SQInteger len)
 	return t;
 }
 
-void StringTable::Resize(SQInteger size)
+void SQStringTable::Resize(SQInteger size)
 {
 	SQInteger oldsize=_numofslots;
 	SQString **oldtable=_strings;
@@ -552,7 +556,7 @@ void StringTable::Resize(SQInteger size)
 	SQ_FREE(oldtable,oldsize*sizeof(SQString*));
 }
 
-void StringTable::Remove(SQString *bs)
+void SQStringTable::Remove(SQString *bs)
 {
 	SQString *s;
 	SQString *prev=NULL;
