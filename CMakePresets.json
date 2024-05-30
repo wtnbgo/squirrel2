@@ -1,0 +1,48 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Default Config",
+            "description": "Default build using Ninja generator",
+            "binaryDir": "$env{BUILD_DIR}",
+            "environment": {
+                "BUILD_DIR": "build/${presetName}"
+            },
+            "cacheVariables": {
+                "CMAKE_INSTALL_LIBDIR": "lib/${presetName}"
+            }
+        },
+        {
+            "name": "x86-windows",
+            "displayName": "for windows",
+            "description": "windows build",
+            "inherits": "default",
+            "architecture": "Win32",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER":"cl"
+            }
+        },
+        {
+            "name": "x64-windows",
+            "displayName": "for windows x64",
+            "description": "windows x64 build",
+            "inherits": "default",
+            "architecture": "x64",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER":"cl"
+            }
+        }
+    ],
+
+    "buildPresets": [
+        {
+            "name": "x86-windows",
+            "configurePreset": "x86-windows"
+        },
+        {
+            "name": "x64-windows",
+            "configurePreset": "x64-windows"
+        }
+    ]
+}

@@ -7,14 +7,11 @@ add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/Z
 
 project(squirrel VERSION 2.2.4)
 
-set(LIBNAME lib${PROJECT_NAME})
-set(EXENAME sq)
-
 # ----------------------------------------------------
 # squirrel library
 # ----------------------------------------------------
 
-add_library( ${LIBNAME} STATIC
+add_library(libsquirrel STATIC
 	squirrel/sqapi.cpp
 	squirrel/sqbaselib.cpp
 	squirrel/sqclass.cpp
@@ -33,6 +30,40 @@ add_library( ${LIBNAME} STATIC
 	sqstdlib/sqstdstring.cpp
 	sqstdlib/sqstdaux.cpp
 	sqstdlib/sqstdrex.cpp
+)
+
+target_sources(libsquirrel PUBLIC
+    FILE_SET public_headers
+    TYPE HEADERS
+	BASE_DIRS include
+	FILES
+		include/sqstdaux.h
+		include/sqstdblob.h
+		include/sqstdio.h
+		include/sqstdmath.h
+		include/sqstdstring.h
+		include/sqstdsystem.h
+		include/squirrel.h
+)
+
+target_include_directories( libsquirrel PUBLIC
+	include
+)
+
+target_include_directories( libsquirrel PRIVATE 
+	sqstdlib
+	squirrel
+)
+
+get_target_property(SQUIRREL_PUBLIC_HEADERS libsquirrel INTERFACE_SOURCES)
+
+set_target_properties(libsquirrel PROPERTIES PUBLIC_HEADER "${MYLIB_PUBLIC_HEADERS}")
+
+# ----------------------------------------------------
+# sq object
+# ----------------------------------------------------
+
+add_library( libsqobject STATIC
 	sqobject/sqobjectinfo.cpp
 	sqobject/sqthread.cpp
 	sqobject/sqobjectclass.cpp
@@ -40,32 +71,70 @@ add_library( ${LIBNAME} STATIC
 	sqobject/sqratfunc.cpp
 )
 
-target_include_directories( ${LIBNAME} PUBLIC
-	include
-	sqrat
+target_sources(libsquirrel PUBLIC
+    FILE_SET public_headers
+    TYPE HEADERS
+	BASE_DIRS sqobject
+	FILES
+	sqobject/sqcont.h
+	sqobject/sqobjectclass.h
+	sqobject/sqobjectinfo.h  
+	sqobject/sqthread.h
+)
+
+target_sources(libsquirrel PUBLIC
+    FILE_SET public_headers
+    TYPE HEADERS
+	BASE_DIRS sqrat
+	FILES
+	sqrat/sqrat.h
+	sqrat/sqratimport.h
+	sqrat/sqrat/sqratAllocator.h
+	sqrat/sqrat/sqratBridgeMethods.h
+	sqrat/sqrat/sqratCastMethods.h
+	sqrat/sqrat/sqratClass.h
+	sqrat/sqrat/sqratClassType.h
+	sqrat/sqrat/sqratConst.h
+	sqrat/sqrat/sqratFunction.h
+	sqrat/sqrat/sqratGlobalMethods.h
+	sqrat/sqrat/sqratMemberMethods.h
+	sqrat/sqrat/sqratObject.h
+	sqrat/sqrat/sqratOverloadMethods.h
+	sqrat/sqrat/sqratPrintf.h
+	sqrat/sqrat/sqratProxyMethods.h
+	sqrat/sqrat/sqratScript.h
+	sqrat/sqrat/sqratTable.h
+	sqrat/sqrat/sqratTypes.h
+	sqrat/sqrat/sqratUtil.h
+)
+
+target_include_directories( libsqobject PUBLIC
 	sqobject
+	sqrat
 )
 
-target_include_directories( ${LIBNAME} PRIVATE 
-	sqstdlib
-	squirrel
-)
-
-target_compile_definitions( ${LIBNAME} PUBLIC
-	USESQRAT
+target_link_libraries( libsqobject PUBLIC
+	libsquirrel
 )
 
 # ----------------------------------------------------
 # sq command
 # ----------------------------------------------------
 
-add_executable( ${EXENAME}
+add_executable( sq
 	sq/sq.cpp
 	sqstdlib/sqstdsystem.cpp
 	sqobject/sqfile.cpp
 	squirrel/sqmem.cpp
 )
 
-target_link_libraries( ${EXENAME} PRIVATE
+target_link_libraries( sq PRIVATE
 	libsquirrel
+	libsqobject
 )
+
+# ----------------------------------------------------
+# install
+# ----------------------------------------------------
+
+install(TARGETS libsquirrel libsqobject sq FILE_SET public_headers)

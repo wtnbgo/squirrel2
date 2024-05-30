@@ -29,13 +29,18 @@ sqrat  C++用のsquirrelバインドツール
     読んでね.txt	このファイル
     
     CMakeLists.txt  ビルド用
+    CMakePresets.json プリセット定義
 
 ●コンパイル
 
 cmake でビルドできます
 
-    cmake -B build
-    cmake --build build
+実行例(preset利用)
+    cmake --preset x86-windows
+    cmake --build build/x86-windows
+    cmake --install build/x86-windows --prefix install
+
+
 
 ●ライセンス
 

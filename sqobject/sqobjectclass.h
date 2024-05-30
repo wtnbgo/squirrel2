@@ -11,6 +11,8 @@
 #define SQOBJECTNAME _SC("Object")
 #endif
 
+#define USESQRAT
+
 // オブジェクトバインド用処理
 #ifdef USESQPLUS
 #include <sqplus.h>
