@@ -10,7 +10,8 @@
                 "BUILD_DIR": "build/${presetName}"
             },
             "cacheVariables": {
-                "CMAKE_INSTALL_LIBDIR": "lib/${presetName}"
+                "CMAKE_INSTALL_LIBDIR": "lib/${presetName}",
+                "CMAKE_INSTALL_BINDIR": "bin/${presetName}"
             }
         },
         {
@@ -32,17 +33,6 @@
             "cacheVariables": {
                 "CMAKE_C_COMPILER":"cl"
             }
-        }
-    ],
-
-    "buildPresets": [
-        {
-            "name": "x86-windows",
-            "configurePreset": "x86-windows"
-        },
-        {
-            "name": "x64-windows",
-            "configurePreset": "x64-windows"
         }
     ]
 }

@@ -46,24 +46,20 @@ target_sources(libsquirrel PUBLIC
 		include/squirrel.h
 )
 
-target_include_directories( libsquirrel PUBLIC
+target_include_directories(libsquirrel PUBLIC
 	include
 )
 
-target_include_directories( libsquirrel PRIVATE 
+target_include_directories(libsquirrel PRIVATE 
 	sqstdlib
 	squirrel
 )
-
-get_target_property(SQUIRREL_PUBLIC_HEADERS libsquirrel INTERFACE_SOURCES)
-
-set_target_properties(libsquirrel PROPERTIES PUBLIC_HEADER "${MYLIB_PUBLIC_HEADERS}")
 
 # ----------------------------------------------------
 # sq object
 # ----------------------------------------------------
 
-add_library( libsqobject STATIC
+add_library(libsqobject STATIC
 	sqobject/sqobjectinfo.cpp
 	sqobject/sqthread.cpp
 	sqobject/sqobjectclass.cpp
@@ -71,7 +67,7 @@ add_library( libsqobject STATIC
 	sqobject/sqratfunc.cpp
 )
 
-target_sources(libsquirrel PUBLIC
+target_sources(libsqobject PUBLIC
     FILE_SET public_headers
     TYPE HEADERS
 	BASE_DIRS sqobject
@@ -82,7 +78,7 @@ target_sources(libsquirrel PUBLIC
 	sqobject/sqthread.h
 )
 
-target_sources(libsquirrel PUBLIC
+target_sources(libsqobject PUBLIC
     FILE_SET public_headers
     TYPE HEADERS
 	BASE_DIRS sqrat
@@ -108,12 +104,12 @@ target_sources(libsquirrel PUBLIC
 	sqrat/sqrat/sqratUtil.h
 )
 
-target_include_directories( libsqobject PUBLIC
+target_include_directories(libsqobject PRIVATE
 	sqobject
 	sqrat
 )
 
-target_link_libraries( libsqobject PUBLIC
+target_link_libraries(libsqobject PUBLIC
 	libsquirrel
 )
 
